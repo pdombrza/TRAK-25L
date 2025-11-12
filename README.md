@@ -2,9 +2,9 @@
 Repository for the Real-Time Ray-Traced Soft Shadows project.
 
 ### Team members
-* Pawe≥ Dombrzalski
+* Pawe≈Ç Dombrzalski
 * Aleksander Kruk
-* Bartosz Kis≥y
+* Bartosz Kis≈Çy
 
 ### Buliding the project 
 * Open the project in Visual Studio
