@@ -1,7 +1,10 @@
-#include <iostream>
+﻿#include <iostream>
 #include <memory>
 #include <chrono>
 #include <cuda_runtime.h>
+#include <optix_function_table_definition.h>
+#include <optix.h>
+#include <optix_stubs.h>
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
@@ -11,6 +14,15 @@
 #include "kernel/kernel.h"
 #include "shader/shader.h"
 
+#define OPTIX_CHECK(call) \
+    { \
+        OptixResult res = call; \
+        if (res != OPTIX_SUCCESS) { \
+            std::cerr << "OptiX call (" #call ") failed: " << res << std::endl; \
+            return 1; \
+        } \
+    }
+
 void processInput(GLFWwindow* window);
 
 int main() {
@@ -18,6 +30,17 @@ int main() {
 		int runtimeVersion = 0;
 		cudaRuntimeGetVersion(&runtimeVersion);
 		std::cout << "CUDA Runtime Version: " << runtimeVersion / 1000 << "." << (runtimeVersion % 1000) / 10 << "\n";
+
+		cudaFree(0);
+		OPTIX_CHECK(optixInit());
+
+		// Create OptiX context
+		CUcontext cuCtx = 0;
+		OptixDeviceContext context = nullptr;
+		OptixDeviceContextOptions options = {};
+		OPTIX_CHECK(optixDeviceContextCreate(cuCtx, &options, &context));
+
+		std::cout << "OptiX initialized successfully" << std::endl;
 
 		if (!glfwInit()) { // TODO: move OpenGL related code to Window class
 			std::cerr << "Failed to initialize GLFW" << std::endl;

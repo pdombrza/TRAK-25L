@@ -32,6 +32,11 @@ else()
 	message(STATUS "No CUDA compiler found")
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
+
+find_package(OptiX90 REQUIRED)
+message(STATUS "OptiX90 include dir: ${OPTIX90_INCLUDE_DIR}")
+
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
 file(GLOB_RECURSE MODULE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sources/*")
@@ -44,6 +49,8 @@ add_subdirectory(sources/shader)
 add_subdirectory(sources/hittable)
 add_subdirectory(sources/hittablelist)
 
+
+target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC OPTIX_USE_STUBS)
 add_compile_definitions(SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
 add_compile_definitions("${CMAKE_PROJECT_NAME}" PUBLIC SHADERS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/shaders/")
 
@@ -61,11 +68,12 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:-G -lineinfo>>
     $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:-O3 -lineinfo ${GENCODE_FLAGS}>>
 )
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE OPTIX_USE_STUBS)
 
 target_include_directories("${CMAKE_PROJECT_NAME}" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
-
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC "${OPTIX90_INCLUDE_DIR}")
 
 target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE Kernel Ray Shader Hittable)
 
-target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm glfw glad)
+target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm glfw glad CUDA::cudart CUDA::cuda_driver)
