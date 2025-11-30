@@ -69,3 +69,21 @@ void Camera::updateCameraVectors() {
     Right = glm::normalize(glm::cross(Front, WorldUp));
     Up = glm::normalize(glm::cross(Right, Front));
 }
+
+CameraData cameraToData(const Camera& cam, float aspect, float viewportHeight) {
+    CameraData data;
+    float viewportWidth = aspect * viewportHeight;
+
+    glm::vec3 w = glm::normalize(cam.Front);
+    glm::vec3 u = glm::normalize(glm::cross(w, cam.Up));
+    glm::vec3 v = glm::cross(u, w);
+
+    data.origin = cam.Position;
+    data.horizontal = u * viewportWidth;
+    data.vertical = v * viewportHeight;
+    data.lowerLeftCorner = cam.Position + w
+        - 0.5f * data.horizontal
+        - 0.5f * data.vertical;
+
+    return data;
+}

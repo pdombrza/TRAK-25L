@@ -49,3 +49,12 @@ private:
     // Recalculate the camera basis vectors
     void updateCameraVectors();
 };
+
+struct CameraData {
+    glm::vec3 origin;
+    glm::vec3 horizontal;
+    glm::vec3 vertical;
+    glm::vec3 lowerLeftCorner;
+};
+
+CameraData cameraToData(const Camera& cam, float aspect, float viewportHeight = 2.0f);
