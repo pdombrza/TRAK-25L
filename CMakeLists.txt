@@ -56,6 +56,7 @@ add_subdirectory(sources/framebuffer)
 add_subdirectory(sources/shader)
 add_subdirectory(sources/aabb)
 add_subdirectory(sources/bvh)
+add_subdirectory(sources/intersection)
 
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC OPTIX_USE_STUBS)

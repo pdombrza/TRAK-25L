@@ -30,14 +30,14 @@ __device__ BVHNode::BVHNode(Hittable** objects, int start, int end, utils::rando
 	box = joinAABBs(boxLeft, boxRight);
 }
 
-__device__ cuda::std::optional<HitRecord> BVHNode::hit(const Ray& ray, float rayTMin, float rayTMax) const {
+__device__ cuda::std::optional<Intersection> BVHNode::hit(const Ray& ray, float rayTMin, float rayTMax) const {
 	if (!box.hit(ray, rayTMin, rayTMax)) {
 		return {};
 	}
-	cuda::std::optional<HitRecord> leftHit = left->hit(ray, rayTMin, rayTMax);
-	cuda::std::optional<HitRecord> rightHit = right->hit(ray, rayTMin, rayTMax);
+	cuda::std::optional<Intersection> leftHit = left->hit(ray, rayTMin, rayTMax);
+	cuda::std::optional<Intersection> rightHit = right->hit(ray, rayTMin, rayTMax);
 	if (leftHit.has_value() && rightHit.has_value()) {
-		return (leftHit->t < rightHit->t) ? leftHit : rightHit;
+		return (leftHit->hitRec.t < rightHit->hitRec.t) ? leftHit : rightHit;
 	}
 	else if (leftHit.has_value()) {
 		return leftHit;

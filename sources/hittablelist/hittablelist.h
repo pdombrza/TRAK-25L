@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cuda/std/optional>
+#include <glm/glm.hpp>
 
 #include "hittable/hittable.h"
+#include "aabb/aabb.h"
 #include "material/material.h"
 #include "hitrec/hitrec.h"
 #include "ray/ray.h"

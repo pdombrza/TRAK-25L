@@ -149,6 +149,7 @@ int main() {
 		CudaRenderer renderer(&scene, width, height);
 		renderer.registerGLTexture(glTex);
 		renderer.setupScene(h_camera);
+		std::cout << "Scene set up completed." << std::endl;
 		shader.use();
 
 		glViewport(0, 0, width, height);

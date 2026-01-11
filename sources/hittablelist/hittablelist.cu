@@ -1,7 +1,4 @@
-#include <glm/glm.hpp>
-
 #include "hittablelist.h"
-#include "aabb/aabb.h"
 
 
 __device__ void HittableList::clear() {
@@ -21,21 +18,26 @@ __device__ HitScatterRecord HittableList::hit(const Ray& ray, float rayTMin, flo
 	float closestDist = rayTMax;
 	bool hitAnything = false;
 	Hittable* closestObj = nullptr;
+	Material* closestMat = nullptr;
 	
 	for (int i = 0; i < objCount; i++) {
 		Hittable* object = objects[i];
-		cuda::std::optional<HitRecord> tempRec = object->hit(ray, rayTMin, rayTMax);
-		if (tempRec.has_value() && tempRec.value().t < closestDist) {
-			hitAnything = true;
-			closestObj = object;
-			closestDist = tempRec.value().t;
-			closestHit = tempRec.value();
+		cuda::std::optional<Intersection> tempInt = object->hit(ray, rayTMin, rayTMax);
+		if (tempInt.has_value()) {
+			const Intersection& result = tempInt.value();
+			if (result.hitRec.t < closestDist) {
+				hitAnything = true;
+				closestObj = object;
+				closestDist = result.hitRec.t;
+				closestHit = result.hitRec;
+				closestMat = result.mat;
+			}
 		}
 	}
 	if (!hitAnything) return HSRec;
 	HSRec.hitRec = closestHit;
-	cuda::std::optional<ScatteringRecord> sRec = closestObj->getMaterial()->scatter(ray, closestHit, rng);
-	HSRec.scatterRec = sRec;
+	if (closestMat != nullptr)
+		HSRec.scatterRec = closestMat->scatter(ray, closestHit, rng);
 
 	return HSRec;
 }

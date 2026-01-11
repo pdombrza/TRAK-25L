@@ -6,6 +6,7 @@
 #include <cuda/std/optional>
 
 #include "hittable/hittable.h"
+#include "intersection/intersection.h"
 #include "hittablelist/hittablelist.h"
 #include "aabb/aabb.h"
 
@@ -23,10 +24,9 @@ public:
 			delete right;
 		}
 	};
-	__device__ virtual cuda::std::optional<HitRecord> hit(const Ray& ray, float rayTMin, float rayTMax) const override;
+	__device__ virtual cuda::std::optional<Intersection> hit(const Ray& ray, float rayTMin, float rayTMax) const override;
 	__device__ virtual AABB boundingBox() const override;
-	__device__ virtual HitRecord constructHitRecord(const Ray& ray, float t) const { return {}; };
-	__device__ virtual Material* getMaterial() const { return nullptr; };
+	__device__ virtual Intersection constructIntersection(const Ray& ray, float t) const { return {}; };
 };
 
 __device__ inline bool boxXCompare(Hittable* a, Hittable* b) {
