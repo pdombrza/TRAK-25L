@@ -71,5 +71,6 @@ public:
 	virtual void setupScene(Camera& camera) const;
 	virtual void destroyScene() const;
 	virtual int render(Camera& camera) override;
+	virtual void setSamplesPerPixel(int newSamplesPerPixel) { samplesPerPixel = newSamplesPerPixel; };
 	std::shared_ptr<glm::vec3[]> getHostPixels() const { return h_Fb.getHostPixels(); };
 };

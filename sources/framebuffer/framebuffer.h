@@ -25,8 +25,8 @@ public:
 	__host__ void initialize();
 	__host__ void cleanup();
 	__device__ void writePixel(int x, int y, const glm::vec3& color);
-	__device__ glm::vec3 color(const Ray& ray, HittableList* world, utils::random::RNG& rng);
-	__device__ glm::vec3 colorPixel(int i, int j, int nx, int ny, Camera* camera, HittableList* world, utils::random::RNG& rng);
+	__device__ glm::vec3 color(const Ray& ray, HittableList* world, int samples, utils::random::RNG& rng);
+	__device__ glm::vec3 colorPixel(int i, int j, int nx, int ny, Camera* camera, HittableList* world, int samples, utils::random::RNG& rng);
 	__host__ __device__ float4* getPixels() const { return pixels; };
 	__host__ __device__ int getWidth() const { return width; };
 	__host__ __device__ int getHeight() const { return height; };

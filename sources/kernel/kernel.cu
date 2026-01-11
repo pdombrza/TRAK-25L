@@ -1,6 +1,6 @@
 #include "kernel.h"
 
-__global__ void renderScene(Framebuffer* d_Fb, Camera* camera, HittableList* world, curandState *randState, cudaSurfaceObject_t surfObj) {
+__global__ void renderScene(Framebuffer* d_Fb, Camera* camera, HittableList* world, int samples, curandState *randState, cudaSurfaceObject_t surfObj) {
 	int x = d_Fb->getWidth();
 	int y = d_Fb->getHeight();
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -9,7 +9,7 @@ __global__ void renderScene(Framebuffer* d_Fb, Camera* camera, HittableList* wor
     int pixelIdx = j * x + i;
 	curandState* localRandState = &randState[pixelIdx];
 	utils::random::RNG rng(localRandState);
-	glm::vec3 col = d_Fb->colorPixel(i, j, x, y, camera, world, rng);
+	glm::vec3 col = d_Fb->colorPixel(i, j, x, y, camera, world, samples, rng);
 	if (surfObj) {
 		uchar4 px = make_uchar4(col.r * 255, col.g * 255, col.b * 255, 255);
 		surf2Dwrite(px, surfObj, i * sizeof(uchar4), (y - 1 - j));

@@ -19,10 +19,10 @@ __device__ void Framebuffer::writePixel(int x, int y, const glm::vec3& color) {
 	pixels[index] = make_float4(col.r, col.g, col.b, 1.0f);
 }
 
-__device__ glm::vec3 Framebuffer::color(const Ray& ray, HittableList* world, utils::random::RNG& rng) {
+__device__ glm::vec3 Framebuffer::color(const Ray& ray, HittableList* world, int samples, utils::random::RNG& rng) {
 	Ray currentRay = ray;
 	glm::vec3 attenuation(1.0f, 1.0f, 1.0f);
-	for (int i = 0; i < 50; i++) { // depth = 50
+	for (int i = 0; i < samples; i++) {
 		HitScatterRecord HSRec = world->hit(currentRay, 0.001f, INF, rng);
 		if (HSRec.hitRec.has_value()) {
 			HitRecord hitrec = HSRec.hitRec.value();
@@ -42,12 +42,12 @@ __device__ glm::vec3 Framebuffer::color(const Ray& ray, HittableList* world, uti
 	return glm::vec3(0.0f, 0.0f, 0.0f); // exceeded recursion depth
 }
 
-__device__ glm::vec3 Framebuffer::colorPixel(int i, int j, int nx, int ny, Camera* camera, HittableList* world, utils::random::RNG& rng) {
+__device__ glm::vec3 Framebuffer::colorPixel(int i, int j, int nx, int ny, Camera* camera, HittableList* world, int samples, utils::random::RNG& rng) {
 	glm::vec3 col(0.0f);
 
 	for (int s = 0; s < 100; s++) {
 		Ray r = camera->getRay(i, j, rng);
-		col += color(r, world, rng);
+		col += color(r, world, samples, rng);
 	}
 
 	col /= float(100);

@@ -63,7 +63,7 @@ int CudaRenderer::render(Camera& camera) { // TODO: profile this
 	dim3 blocks(imgWidth / xBlock + 1, imgHeight / yBlock + 1);
 	dim3 threads(xBlock, yBlock);
 
-	renderScene<<<blocks, threads>>>(d_Fb, d_camera, d_World, d_randStates, surfObj);
+	renderScene<<<blocks, threads>>>(d_Fb, d_camera, d_World, samplesPerPixel, d_randStates, surfObj);
 	checkCudaErrors(cudaGetLastError());
 	//checkCudaErrors(cudaDeviceSynchronize());
 
