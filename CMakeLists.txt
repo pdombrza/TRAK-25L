@@ -43,11 +43,19 @@ file(GLOB_RECURSE MODULE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/sources/*")
 
 # here add subdirectory created in your module
 add_subdirectory(sources/ray)
-add_subdirectory(sources/utils)
-add_subdirectory(sources/kernel)
-add_subdirectory(sources/shader)
+add_subdirectory(sources/hitrec)
 add_subdirectory(sources/hittable)
 add_subdirectory(sources/hittablelist)
+add_subdirectory(sources/camera)
+add_subdirectory(sources/renderer)
+add_subdirectory(sources/utils)
+add_subdirectory(sources/material)
+add_subdirectory(sources/scattering_record)
+add_subdirectory(sources/kernel)
+add_subdirectory(sources/framebuffer)
+add_subdirectory(sources/shader)
+add_subdirectory(sources/aabb)
+add_subdirectory(sources/bvh)
 
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PUBLIC OPTIX_USE_STUBS)
@@ -61,7 +69,6 @@ if(MSVC) # Microsoft Visual Studio
 endif()
 
 # CUDA
-set(GENCODE_FLAGS "-gencode arch=compute_120,code=sm_120")
 set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
 
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
@@ -74,6 +81,6 @@ target_include_directories("${CMAKE_PROJECT_NAME}" PUBLIC "${CMAKE_CURRENT_SOURC
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC "${OPTIX90_INCLUDE_DIR}")
 
-target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE Kernel Ray Shader Hittable)
+target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE Kernel Ray Shader Hittable Renderer)
 
 target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm glfw glad CUDA::cudart CUDA::cuda_driver)

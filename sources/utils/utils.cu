@@ -16,6 +16,18 @@ __device__ glm::vec3 utils::random::RNG::sampleSquare() {
 	return glm::vec3(curand_uniform(state) - 0.5f, curand_uniform(state) - 0.5f, 0.0f);
 }
 
+__device__ int utils::random::RNG::getRandomInt(int min, int max) {
+	if (min > max) {
+		int tmp = min;
+		min = max;
+		max = tmp;
+	}
+	int range = max - min + 1;
+	int r = min + static_cast<int>(curand_uniform(state) * static_cast<float>(range));
+	if (r > max) r = max;
+	return r;
+}
+
 __device__ glm::vec3 utils::random::RNG::randomVec3Norm() {
 	glm::vec3 res = randomVec3(0.0f, 1.0f);
 	return res;

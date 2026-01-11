@@ -1,5 +1,6 @@
 #include "hittable.h"
 
+
 __device__ HitRecord Sphere::constructHitRecord(const Ray& ray, float t) const {
 	HitRecord rec{};
 	rec.t = t;
@@ -7,6 +8,7 @@ __device__ HitRecord Sphere::constructHitRecord(const Ray& ray, float t) const {
 	glm::vec3 outwardNormal = glm::normalize(rec.p - center);
 	outwardNormal *= sign(radius);
 	rec.setFaceNormal(ray, outwardNormal);
+	
 	return rec;
 }
 
@@ -17,7 +19,7 @@ __device__ cuda::std::optional<HitRecord> Sphere::hit(const Ray& ray, float rayT
 	float c = glm::dot(distOc, distOc) - radius * radius;
 	auto discriminant = halfb * halfb - a * c;
 	if (discriminant < 0) return {};
-
+	
 	float sqrtDiscriminant = sqrtf(discriminant);
 	float root = (halfb - sqrtDiscriminant) / a;
 	if (root <= rayTMin || root >= rayTMax) {
@@ -30,6 +32,21 @@ __device__ cuda::std::optional<HitRecord> Sphere::hit(const Ray& ray, float rayT
 	return record;
 }
 
+__device__ void Sphere::setMaterial(Material* mat) {
+	material = mat;
+}
+
+__device__ Material* Sphere::getMaterial() const {
+	return material;
+}
+
 __device__ glm::vec3 Sphere::getCenter() const {
 	return center;
+}
+
+__device__ AABB Sphere::boundingBox() const {
+	return AABB(
+		center - glm::vec3(radius, radius, radius),
+		center + glm::vec3(radius, radius, radius)
+	);
 }

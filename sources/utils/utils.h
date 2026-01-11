@@ -42,6 +42,7 @@ namespace utils {
 			};
 			__device__ float getRandomUniform();
 			__device__ glm::vec3 sampleSquare();
+			__device__ int getRandomInt(int min, int max);
 			template<typename T>
 			__device__ glm::vec<3, T, glm::defaultp> randomVec3(T min, T max) {
 				return glm::vec<3, T, glm::defaultp>(getRandom(min, max), getRandom(min, max), getRandom(min, max));

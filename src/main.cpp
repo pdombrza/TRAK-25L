@@ -11,8 +11,14 @@
 #include <GLFW/glfw3.h>
 #include <cuda_gl_interop.h>
 
+#include "camera/camera.h"
+#include "renderer/renderer.h"
+#include "hittable/hittable.h"
+#include "hittablelist/hittablelist.h"
+#include "material/material.h"
 #include "kernel/kernel.h"
 #include "shader/shader.h"
+
 
 #define OPTIX_CHECK(call) \
     { \
@@ -42,6 +48,9 @@ int main() {
 
 		std::cout << "OptiX initialized successfully" << std::endl;
 
+		cudaRuntimeGetVersion(&runtimeVersion);
+		std::cout << "CUDA Runtime Version: " << runtimeVersion / 1000 << "." << (runtimeVersion % 1000) / 10 << "\n";
+
 		if (!glfwInit()) { // TODO: move OpenGL related code to Window class
 			std::cerr << "Failed to initialize GLFW" << std::endl;
 			return -1;
@@ -62,7 +71,7 @@ int main() {
 
 		glfwMakeContextCurrent(window);
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		glfwSwapInterval(0); 
+		glfwSwapInterval(0);
 
 		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 			std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -118,8 +127,6 @@ int main() {
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		cudaGraphicsResource* glResource = nullptr;
-		cudaGraphicsGLRegisterImage(&glResource, glTex, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
 
 
 		int xBlock = 16;
@@ -127,18 +134,26 @@ int main() {
 		std::cerr << "Rendering a " << width << "x" << height << " image " << std::endl;
 		std::cerr << "in " << xBlock << "x" << yBlock << " blocks" << std::endl;
 		int numPixels = width * height;
-		
+
+		CameraOrientation orientation;
+		orientation.lookFrom = glm::vec3(0.0f, 0.0f, 1.0f);
+		orientation.lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
+		orientation.vUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		Camera h_camera(orientation, 90.0f, (float)width / (float)height);
+		//h_camera.setVFov(20.0f); Tweak this for defocus disc and fov
+		//h_camera.setDefocusAngle(0.6f);
+		//h_camera.setFocusDist(10.0f);
+
+		HittableList scene{};
+
+		CudaRenderer renderer(&scene, width, height);
+		renderer.registerGLTexture(glTex);
+		renderer.setupScene(h_camera);
 		shader.use();
 
 		glViewport(0, 0, width, height);
 		glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) -> void { glViewport(0, 0, width, height); });
-		const auto startTime = std::chrono::steady_clock::now();
-		launchRenderer(glResource, width, height, xBlock, yBlock);
-
-		const auto endTime = std::chrono::steady_clock::now();
-		const std::chrono::duration<double> renderTime = endTime - startTime;
-		std::cout << "Render time: " << renderTime << std::endl;
-
+		renderer.render(h_camera); // Render once for now - too slow to do multiple frames
 
 		while (!glfwWindowShouldClose(window)) {
 			processInput(window);
@@ -154,9 +169,8 @@ int main() {
 			glfwPollEvents();
 		}
 
-		if (glResource) cudaGraphicsUnregisterResource(glResource);
+		renderer.destroyScene();
 	}
-
 
 	cudaDeviceReset();
 	glfwTerminate();
