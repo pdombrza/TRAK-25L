@@ -12,6 +12,7 @@
 #include <cuda_gl_interop.h>
 
 #include "camera/camera.h"
+#include "camera/camera_controller.h"
 #include "renderer/renderer.h"
 #include "hittable/hittable.h"
 #include "hittablelist/hittablelist.h"
@@ -29,7 +30,7 @@
         } \
     }
 
-void processInput(GLFWwindow* window);
+void processInput(GLFWwindow* window, CameraController* controller);
 
 int main() {
 	{
@@ -135,10 +136,13 @@ int main() {
 		std::cerr << "in " << xBlock << "x" << yBlock << " blocks" << std::endl;
 		int numPixels = width * height;
 
-		CameraOrientation orientation;
-		orientation.lookFrom = glm::vec3(0.0f, 0.0f, 1.0f);
-		orientation.lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
-		orientation.vUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		// Initialize camera controller with starting position
+		CameraController cameraController(glm::vec3(0.0f, 0.0f, 1.0f));
+		cameraController.setMoveSpeed(3.0f);
+		cameraController.setMouseSensitivity(0.15f);
+
+		// Create initial camera
+		CameraOrientation orientation = cameraController.getCameraOrientation();
 		Camera h_camera(orientation, 90.0f, (float)width / (float)height);
 		//h_camera.setVFov(20.0f); Tweak this for defocus disc and fov
 		//h_camera.setDefocusAngle(0.6f);
@@ -147,7 +151,8 @@ int main() {
 		HittableList scene{};
 
 		CudaRenderer renderer(&scene, width, height);
-		renderer.setSamplesPerPixel(10);
+		// Set max ray bounce depth (not samples per pixel - that's hardcoded to 100 in framebuffer)
+		renderer.setSamplesPerPixel(10);  // This is actually max ray depth/bounces
 		renderer.registerGLTexture(glTex);
 		renderer.setupScene(h_camera);
 		std::cout << "Scene set up completed." << std::endl;
@@ -155,11 +160,28 @@ int main() {
 
 		glViewport(0, 0, width, height);
 		glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) -> void { glViewport(0, 0, width, height); });
-		renderer.render(h_camera); // Render once for now - too slow to do multiple frames
+
+		// FPS counter
+		double lastTime = glfwGetTime();
+		int nbFrames = 0;
 
 		while (!glfwWindowShouldClose(window)) {
-			processInput(window);
+			// Update delta time for smooth movement
+			cameraController.updateDeltaTime();
 
+			// Process input
+			processInput(window, &cameraController);
+			cameraController.processMouse(window);
+
+			// Update camera with new orientation
+			orientation = cameraController.getCameraOrientation();
+			h_camera = Camera(orientation, 90.0f, (float)width / (float)height);
+
+			// Update camera on device and render
+			renderer.updateCamera(h_camera);
+			renderer.render(h_camera);
+
+			// Display rendered texture
 			glClear(GL_COLOR_BUFFER_BIT);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, glTex);
@@ -169,6 +191,15 @@ int main() {
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
+
+			// FPS counter
+			nbFrames++;
+			double currentTime = glfwGetTime();
+			if (currentTime - lastTime >= 1.0) {
+				std::cout << "FPS: " << nbFrames << std::endl;
+				nbFrames = 0;
+				lastTime = currentTime;
+			}
 		}
 
 		renderer.destroyScene();
@@ -179,7 +210,11 @@ int main() {
 	return 0;
 }
 
-void processInput(GLFWwindow* window) {
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+void processInput(GLFWwindow* window, CameraController* controller) {
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
+
+	if (controller) {
+		controller->processKeyboard(window);
+	}
 }
