@@ -69,6 +69,7 @@ public:
 	virtual int getImgHeight() const { return imgHeight; };
 	void registerGLTexture(GLuint glTex);
 	virtual void setupScene(Camera& camera) const;
+	virtual void updateCamera(Camera& camera) const;
 	virtual void destroyScene() const;
 	virtual int render(Camera& camera) override;
 	virtual void setSamplesPerPixel(int newSamplesPerPixel) { samplesPerPixel = newSamplesPerPixel; };
