@@ -152,6 +152,7 @@ int main() {
 
 		CudaRenderer renderer(&scene, width, height);
 		// Set max ray bounce depth (not samples per pixel - that's hardcoded to 100 in framebuffer)
+		renderer.enableConicalCulling(false);
 		renderer.setSamplesPerPixel(10);  // This is actually max ray depth/bounces
 		renderer.registerGLTexture(glTex);
 		renderer.setupScene(h_camera);
