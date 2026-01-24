@@ -28,6 +28,9 @@ inline void checkCuda(cudaError_t result, char const* const func, const char* co
 }
 
 namespace utils {
+	// Mathematical constants
+	constexpr float PI = 3.14159265358979323846f;
+
 	namespace random {
 		class RNG {
 		private:
