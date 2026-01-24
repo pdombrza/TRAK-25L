@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <fstream>
 #include <execution>
+#include <vector>
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -42,6 +43,11 @@ private:
 	HittableList* d_World_storage = nullptr;
 	BVHNode* d_BVHroot = nullptr;
 	cudaGraphicsResource* glResource = nullptr;
+
+	// Conical ray culling support
+	DynamicObjectInfo* d_dynamicInfo = nullptr;
+	bool conicalCullingEnabled = false;
+	int maxDynamicObjects = 10;
 protected:
 	HittableList* scene;
 	int imgWidth = 400;
@@ -74,4 +80,14 @@ public:
 	virtual int render(Camera& camera) override;
 	virtual void setSamplesPerPixel(int newSamplesPerPixel) { samplesPerPixel = newSamplesPerPixel; };
 	std::shared_ptr<glm::vec3[]> getHostPixels() const { return h_Fb.getHostPixels(); };
+
+	// Conical ray culling methods
+	void enableConicalCulling(bool enable = true);
+	void setMaxDynamicObjects(int maxObjects) { maxDynamicObjects = maxObjects; }
+	void markObjectsAsDynamic(const std::vector<int>& dynamicIndices);
+	bool isConicalCullingEnabled() const { return conicalCullingEnabled; }
+private:
+	void initConicalCulling();
+	void cleanupConicalCulling();
+	void updateDynamicBounds();
 };
