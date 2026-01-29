@@ -19,10 +19,6 @@ __global__ void renderScene(Framebuffer* d_Fb, Camera* camera, HittableList* wor
 	}
 }
 
-// ============================================================================
-// Conical Ray Culling Rendering Kernel
-// ============================================================================
-
 __device__ glm::vec3 colorWithConicalCulling(
     const Ray& ray,
     HittableList* world,
@@ -34,13 +30,10 @@ __device__ glm::vec3 colorWithConicalCulling(
     glm::vec3 attenuation(1.0f, 1.0f, 1.0f);
 
     for (int depth = 0; depth < maxDepth; depth++) {
-        // First, do a standard hit test to get surface info
         HitScatterRecord HSRec = world->hit(currentRay, 0.001f, INF, rng);
 
         if (HSRec.hitRec.has_value()) {
             HitRecord hitrec = HSRec.hitRec.value();
-
-            // Construct cones for this surface point (Algorithm 1)
             ConeSet coneSet;
             constructAndMergeCones(
                 hitrec.p,
@@ -52,34 +45,25 @@ __device__ glm::vec3 colorWithConicalCulling(
 
             if (HSRec.scatterRec.has_value()) {
                 ScatteringRecord scRec = HSRec.scatterRec.value();
-
-                // Check if the scattered ray should be traced (Algorithm 2)
                 float maxRayLength = INF;
                 bool shouldTrace = shouldTraceRay(
                     glm::normalize(scRec.ray.getDirection()),
                     coneSet,
                     maxRayLength
                 );
-
-                // If we should trace, continue with normal path tracing
                 attenuation *= scRec.attenuation;
                 currentRay = scRec.ray;
-
-                // Note: In a more optimized version, we would use maxRayLength
-                // to limit ray length, but for now we keep standard behavior
             } else {
                 return glm::vec3(0.0f);
             }
         } else {
-            // No hit - return environment color
             glm::vec3 direction = glm::normalize(currentRay.getDirection());
             float a = 0.5f * (direction.y + 1.0f);
             glm::vec3 c = (1.0f - a) * glm::vec3(1.0f, 1.0f, 1.0f) + a * glm::vec3(0.5f, 0.7f, 1.0f);
             return attenuation * c;
         }
     }
-
-    return glm::vec3(0.0f); // exceeded recursion depth
+    return glm::vec3(0.0f);
 }
 
 __global__ void renderSceneWithConicalCulling(
@@ -104,23 +88,15 @@ __global__ void renderSceneWithConicalCulling(
     utils::random::RNG rng(localRandState);
 
     glm::vec3 col(0.0f);
-
-    // Multiple samples per pixel
     for (int s = 0; s < samplesPerPixel; s++) {
         Ray r = camera->getRay(i, j, rng);
-
-        // Use conical culling for path tracing
         col += colorWithConicalCulling(r, world, dynamicInfo, maxDepth, rng);
     }
 
     col /= float(samplesPerPixel);
-
-    // Gamma correction
     col[0] = sqrtf(col[0]);
     col[1] = sqrtf(col[1]);
     col[2] = sqrtf(col[2]);
-
-    // Write to output
     if (surfObj) {
         uchar4 px = make_uchar4(
             glm::clamp(col.r, 0.0f, 1.0f) * 255,
@@ -142,15 +118,16 @@ __global__ void initCamera(Camera* cam, int width, int height) {
 
 __global__ void createWorld(Hittable** d_List, HittableList* d_World, BVHNode* d_BVHroot, curandState* randState) {
 	if (threadIdx.x == 0 && blockIdx.x == 0) {
+        auto v0 = glm::vec3(-1.5f, 0.0f, -1.0f);
+        auto v1 = glm::vec3(-0.5f, 0.0f, -1.0f);
+        auto v2 = glm::vec3(-1.0f, 1.0f, -1.5f);
 		d_List[0] = new Sphere(glm::vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(glm::vec3(0.1f, 0.2f, 0.5f)));
-		d_List[1] = new Sphere(glm::vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(glm::vec3(0.8f, 0.8f, 0.0f)));
+        d_List[1] = new Triangle(v0, v1, v2, new Lambertian(glm::vec3(0.8f, 0.1f, 0.1f)));
 		d_List[2] = new Sphere(glm::vec3(1.0f, 0.0f, -1.0f), 0.5, new Metal(glm::vec3(0.8f, 0.6f, 0.2f), 0.5f));
 		d_List[3] = new Sphere(glm::vec3(-1.0f, 0.0f, -1.0f), 0.5, new Dielectric(1.5f));
 		d_List[4] = new Sphere(glm::vec3(-1.0f, 0.0f, -1.0f), 0.45, new Dielectric(1.0f / 1.5f));
 
-		utils::random::RNG rng(&randState[0]);
-
-		new(d_BVHroot) BVHNode(d_List, 0, 5, rng);
+		new(d_BVHroot) BVHNode(d_List, 0, 5);
 		d_List[0] = d_BVHroot;
 		new(d_World) HittableList(d_List, 1, 1);
 	}
@@ -158,11 +135,21 @@ __global__ void createWorld(Hittable** d_List, HittableList* d_World, BVHNode* d
 
 __global__ void destroyWorld(Hittable** d_List, HittableList* d_World, BVHNode* d_BVHroot, int size) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-  //      for (int i = 0; i < d_World->getObjCount(); i++) {
-		//	delete d_List[i];
-		//}
 		delete d_List[0]; 
 		delete d_BVHroot;
 		delete d_World;
     }
+}
+
+__global__ void createMeshTriangles(Hittable** d_List, int startOffset, glm::vec3* d_vertices, int* d_indices, int numTriangles, Material* mat) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= numTriangles) return;
+    int i0 = d_indices[idx * 3 + 0];
+    int i1 = d_indices[idx * 3 + 1];
+    int i2 = d_indices[idx * 3 + 2];
+    glm::vec3 v0 = d_vertices[i0];
+    glm::vec3 v1 = d_vertices[i1];
+    glm::vec3 v2 = d_vertices[i2];
+    Material* triMat = new Lambertian(glm::vec3(0.5f, 0.5f, 0.5f));
+    d_List[startOffset + idx] = new Triangle(v0, v1, v2, triMat);
 }

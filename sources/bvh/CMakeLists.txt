@@ -1,5 +1,5 @@
 set(CMAKE_CXX_STANDARD 23)
-add_library(Bvh bvh.cu bvh.h)
+add_library(Bvh bvh.cu bvh.h linear_bvh_node.h bvh_builder.h "mesh_bvh.h")
 
 target_link_libraries(Bvh PRIVATE CUDA::cudart CUDA::cuda_driver glm)
 

@@ -2,22 +2,28 @@
 
 
 void CudaRenderer::initRenderer() {
+	checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 128 * 1024 * 1024));
+	checkCudaErrors(cudaDeviceSetLimit(cudaLimitStackSize, 4096));
 	int numPixels = imgWidth * imgHeight;
 	checkCudaErrors(cudaMalloc((void**)&d_Fb, sizeof(Framebuffer)));
 	checkCudaErrors(cudaMemcpy(d_Fb, &h_Fb, sizeof(Framebuffer), cudaMemcpyHostToDevice));
 	checkCudaErrors(cudaMalloc((void**)&d_camera, sizeof(Camera)));
-	checkCudaErrors(cudaMalloc((void**)&d_List, 6 * sizeof(Hittable*)));
+	checkCudaErrors(cudaMalloc((void**)&d_List, 5 * sizeof(Hittable*)));
 	checkCudaErrors(cudaMalloc((void**)&d_World, sizeof(HittableList)));
 	checkCudaErrors(cudaMalloc((void**)&d_BVHroot, sizeof(BVHNode)));
 	checkCudaErrors(cudaMalloc((void**)&d_randStates, numPixels * sizeof(curandState)));
+	dim3 blocks(imgWidth / xBlock + 1, imgHeight / yBlock + 1);
+	dim3 threads(xBlock, yBlock);
+	utils::random::randomInit<<<blocks, threads>>>(d_randStates, imgWidth, imgHeight);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
 }
 
 CudaRenderer::~CudaRenderer() {
-	// Cleanup conical culling if enabled
 	if (conicalCullingEnabled) {
 		cleanupConicalCulling();
 	}
-
 	checkCudaErrors(cudaFree(d_List));
 	d_List = nullptr;
 	checkCudaErrors(cudaFree(d_World));
@@ -28,27 +34,108 @@ CudaRenderer::~CudaRenderer() {
 	d_camera = nullptr;
 	checkCudaErrors(cudaFree(d_randStates));
 	d_randStates = nullptr;
-	if (glResource) cudaGraphicsUnregisterResource(glResource); // TODO: consider decoupling gl from renderer - move to separate class
+	if (glResource) cudaGraphicsUnregisterResource(glResource);
 }
 
 void CudaRenderer::registerGLTexture(GLuint glTex) {
 	cudaGraphicsGLRegisterImage(&glResource, glTex, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
 }
 
-void CudaRenderer::setupScene(Camera& camera) const { // TODO: use this in constuctor
-	int numPixels = imgWidth * imgHeight;
+void CudaRenderer::setupScene(Camera& camera) {
+	struct MeshConfig {
+		std::string name; 
+		std::string filepath;
+		glm::vec3 position;
+		glm::vec3 scale;
+		glm::vec3 color;
+		bool isMetal;
+	};
 
-	checkCudaErrors(cudaMemcpy(d_camera, &camera, sizeof(Camera), cudaMemcpyHostToDevice));
-	initCamera<<<1, 1>>>(d_camera, imgWidth, imgHeight);
+	std::vector<MeshConfig> meshesToLoad = {
+		{ "Floor", ASSETS_PATH "cube.obj", glm::vec3(0, -1.0f, 0), glm::vec3(50.0f, 0.1f, 50.0f), glm::vec3(0.5f, 0.5f, 0.5f), false },
+		{ "Box",   ASSETS_PATH "cube.obj", glm::vec3(0, 0.5f, -2.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.8f, 0.2f, 0.2f), false }
+	};
+
+	for (auto& m : meshResources) m.cleanup();
+	meshResources.clear();
+
+	int staticSphereCount = 4;
+	int totalObjects = staticSphereCount + meshesToLoad.size();
+
+	if (d_List) cudaFree(d_List);
+	checkCudaErrors(cudaMalloc((void**)&d_List, totalObjects * sizeof(Hittable*)));
+
+	createStaticObjects<<<1, staticSphereCount>>>(d_List, staticSphereCount);
 	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
-	dim3 blocks(imgWidth / xBlock + 1, imgHeight / yBlock + 1);
-	dim3 threads(xBlock, yBlock);
-	utils::random::randomInit<<<blocks, threads>>>(d_randStates, imgWidth, imgHeight);
-	checkCudaErrors(cudaGetLastError());
+	int currentListIndex = staticSphereCount;
+
+	for (const auto& config : meshesToLoad) {
+		std::cout << "Processing: " << config.name << "..." << std::endl;
+		RawMeshData rawMesh;
+		if (!rawMesh.loadObj(config.filepath)) {
+			std::cerr << "Failed to load " << config.filepath << std::endl;
+			continue;
+		}
+
+		for (auto& v : rawMesh.vertices) {
+			v = v * config.scale;
+			v = v + config.position;
+		}
+
+		BVHBuilder builder;
+		builder.build(rawMesh.vertices, rawMesh.indices);
+
+		std::vector<int> gpuIndices;
+		gpuIndices.reserve(builder.orderedIndices.size() * 3);
+
+		for (int triId : builder.orderedIndices) {
+			gpuIndices.push_back(rawMesh.indices[triId + 0]);
+			gpuIndices.push_back(rawMesh.indices[triId + 1]);
+			gpuIndices.push_back(rawMesh.indices[triId + 2]);
+		}
+
+		for (auto& node : builder.nodes) {
+			if (node.triCount > 0) {
+				node.triIndex *= 3;
+			}
+		}
+
+		GPUMeshData gpuData;
+
+		size_t nodeSize = builder.nodes.size() * sizeof(LinearBVHNode);
+		size_t idxSize = gpuIndices.size() * sizeof(int);
+		size_t vertSize = rawMesh.vertices.size() * sizeof(glm::vec3);
+
+		checkCudaErrors(cudaMalloc((void**)&gpuData.d_nodes, nodeSize));
+		checkCudaErrors(cudaMalloc((void**)&gpuData.d_indices, idxSize));
+		checkCudaErrors(cudaMalloc((void**)&gpuData.d_vertices, vertSize));
+
+		checkCudaErrors(cudaMemcpy(gpuData.d_nodes, builder.nodes.data(), nodeSize, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(gpuData.d_indices, gpuIndices.data(), idxSize, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(gpuData.d_vertices, rawMesh.vertices.data(), vertSize, cudaMemcpyHostToDevice));
+
+		Material** d_tempMat;
+		checkCudaErrors(cudaMalloc((void**)&d_tempMat, sizeof(Material*)));
+		createMaterial<<<1, 1>>>(d_tempMat, config.color, config.isMetal);
+		checkCudaErrors(cudaMemcpy(&gpuData.d_material, d_tempMat, sizeof(Material*), cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaFree(d_tempMat));
+
+		createMeshObject<<<1, 1>>>(
+			d_List,
+			currentListIndex,
+			gpuData.d_nodes,
+			gpuData.d_vertices,
+			gpuData.d_indices,
+			gpuData.d_material
+			);
+
+		meshResources.push_back(gpuData);
+		currentListIndex++;
+	}
+
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	createWorld<<<1, 1>>>(d_List, d_World, d_BVHroot, d_randStates);
+	buildSceneBVH<<<1, 1>>>(d_List, d_World, d_BVHroot, totalObjects);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 }
@@ -178,14 +265,10 @@ void CudaRenderer::markObjectsAsDynamic(const std::vector<int>& dynamicIndices) 
 
 void CudaRenderer::updateDynamicBounds() {
 	if (!conicalCullingEnabled || d_dynamicInfo == nullptr) return;
-
-	// Get dynamic info from device
 	DynamicObjectInfo h_info;
 	checkCudaErrors(cudaMemcpy(&h_info, d_dynamicInfo, sizeof(DynamicObjectInfo), cudaMemcpyDeviceToHost));
 
 	if (h_info.numDynamic == 0) return;
-
-	// Update bounding spheres
 	int blockSize = 256;
 	int numBlocks = (h_info.numDynamic + blockSize - 1) / blockSize;
 	updateDynamicObjectBounds<<<numBlocks, blockSize>>>(

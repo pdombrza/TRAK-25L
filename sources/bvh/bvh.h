@@ -17,7 +17,7 @@ private:
 	AABB box;
 public:
 	__device__ BVHNode() = default;
-	__device__ BVHNode(Hittable** objects, int start, int end, utils::random::RNG& rng);
+	__device__ BVHNode(Hittable** objects, int start, int end);
 	__device__ ~BVHNode() {
 		delete left;
 		if (right != left) {

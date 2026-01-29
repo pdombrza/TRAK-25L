@@ -1,5 +1,5 @@
 set(CMAKE_CXX_STANDARD 23)
-add_library(Hittable hittable.cu hittable.h)
+add_library(Hittable hittable.cu hittable.h triangle.h)
 
 target_link_libraries(Hittable PRIVATE CUDA::cudart CUDA::cuda_driver glm)
 

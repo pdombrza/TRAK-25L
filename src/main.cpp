@@ -80,7 +80,6 @@ int main() {
 			glfwTerminate();
 			return -1;
 		}
-
 		Shader shader(SHADERS_PATH "vertex.vert.glsl", SHADERS_PATH "fragment.frag.glsl");
 
 		float vertices[] = {
@@ -163,38 +162,26 @@ int main() {
 		glViewport(0, 0, width, height);
 		glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) -> void { glViewport(0, 0, width, height); });
 
-		// FPS counter
 		double lastTime = glfwGetTime();
 		int nbFrames = 0;
 
 		while (!glfwWindowShouldClose(window)) {
-			// Update delta time for smooth movement
 			cameraController.updateDeltaTime();
-
-			// Process input
 			processInput(window, &cameraController);
 			cameraController.processMouse(window);
-
-			// Update camera with new orientation
 			orientation = cameraController.getCameraOrientation();
 			h_camera = Camera(orientation, 90.0f, (float)width / (float)height);
-
-			// Update camera on device and render
 			renderer.updateCamera(h_camera);
 			renderer.render(h_camera);
 
-			// Display rendered texture
 			glClear(GL_COLOR_BUFFER_BIT);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, glTex);
-
 			glBindVertexArray(VAO);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
-
 			glfwSwapBuffers(window);
 			glfwPollEvents();
 
-			// FPS counter
 			nbFrames++;
 			double currentTime = glfwGetTime();
 			if (currentTime - lastTime >= 1.0) {

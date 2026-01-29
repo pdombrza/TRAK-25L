@@ -1,6 +1,6 @@
 #include "bvh.h"
 
-__device__ BVHNode::BVHNode(Hittable** objects, int start, int end, utils::random::RNG& rng) {
+__device__ BVHNode::BVHNode(Hittable** objects, int start, int end) {
 	auto bbox = AABB();
 	for (int i = start; i < end; i++) {
 		bbox = joinAABBs(bbox, objects[i]->boundingBox());
@@ -27,8 +27,8 @@ __device__ BVHNode::BVHNode(Hittable** objects, int start, int end, utils::rando
 	else {
 		thrust::sort(thrust::seq, objects + start, objects + end, comparator);
 		int mid = start + objectSpan / 2;
-		left = new BVHNode(objects, start, mid, rng);
-		right = new BVHNode(objects, mid, end, rng);
+		left = new BVHNode(objects, start, mid);
+		right = new BVHNode(objects, mid, end);
 	}
 	AABB boxLeft = left->boundingBox();
 	AABB boxRight = right->boundingBox();

@@ -21,7 +21,26 @@
 #include "material/material.h"
 #include "camera/camera.h"
 #include "kernel/kernel.h"
+#include "mesh/mesh.h"
+#include "bvh/mesh_bvh.h"
+#include "bvh/bvh_builder.h"
 
+
+struct GPUMeshData {
+	LinearBVHNode* d_nodes = nullptr;
+	glm::vec3* d_vertices = nullptr;
+	int* d_indices = nullptr;
+	Material* d_material = nullptr;
+
+	void cleanup() {
+		if (d_nodes) cudaFree(d_nodes);
+		if (d_vertices) cudaFree(d_vertices);
+		if (d_indices) cudaFree(d_indices);
+		if (d_material) {
+			// Need a kernel to delete material, or track it elsewhere
+		}
+	}
+};
 
 class IRenderer {
 public:
@@ -43,8 +62,10 @@ private:
 	HittableList* d_World_storage = nullptr;
 	BVHNode* d_BVHroot = nullptr;
 	cudaGraphicsResource* glResource = nullptr;
-
-	// Conical ray culling support
+	std::vector<GPUMeshData> meshResources;
+	glm::vec3* d_meshVertices = nullptr;
+	int* d_meshIndices = nullptr;
+	int numMeshTriangles = 0;
 	DynamicObjectInfo* d_dynamicInfo = nullptr;
 	bool conicalCullingEnabled = false;
 	int maxDynamicObjects = 10;
@@ -74,7 +95,7 @@ public:
 	virtual void setImgHeight(int newImgHeight) { imgHeight = newImgHeight; };
 	virtual int getImgHeight() const { return imgHeight; };
 	void registerGLTexture(GLuint glTex);
-	virtual void setupScene(Camera& camera) const;
+	virtual void setupScene(Camera& camera);
 	virtual void updateCamera(Camera& camera) const;
 	virtual void destroyScene() const;
 	virtual int render(Camera& camera) override;

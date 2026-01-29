@@ -10,18 +10,25 @@ public:
 	glm::vec3 minPoint{};
 	glm::vec3 maxPoint{};
 
-	__device__ AABB() = default;
-	__device__ AABB(const glm::vec3& minPoint, const glm::vec3& maxPoint)
+	__host__ __device__ AABB() = default;
+	__host__ __device__ AABB(const glm::vec3& minPoint, const glm::vec3& maxPoint)
 		: minPoint(minPoint), maxPoint(maxPoint) {}
 
-    __device__ inline bool hit(const Ray& ray, float tMin, float tMax) const {
+    __host__ __device__ inline bool hit(const Ray& ray, float tMin, float tMax) const {
         for (int axis = 0; axis < 3; axis++) {
-            float invD = 1.0f / ray.getDirection()[axis];
-    
-            float tNear = (minPoint[axis] - ray.getOrigin()[axis]) * invD;
-            float tFar = (maxPoint[axis] - ray.getOrigin()[axis]) * invD;
-            tMin = fmaxf(tMin, fminf(tNear, tFar));
-            tMax = fminf(tMax, fmaxf(tNear, tFar));
+            float dir = ray.getDirection()[axis];
+            float invD = 1.0f / dir;
+
+            float t0 = (minPoint[axis] - ray.getOrigin()[axis]) * invD;
+            float t1 = (maxPoint[axis] - ray.getOrigin()[axis]) * invD;
+
+            if (invD < 0.0f) {
+                float temp = t0; t0 = t1; t1 = temp;
+            }
+
+            tMin = t0 > tMin ? t0 : tMin;
+            tMax = t1 < tMax ? t1 : tMax;
+
             if (tMax <= tMin) {
                 return false;
             }
@@ -29,7 +36,7 @@ public:
         return true;
     }
 
-    __device__ inline int longestAxis() const {
+    __host__ __device__ inline int longestAxis() const {
         glm::vec3 extents = maxPoint - minPoint;
         if (extents.x > extents.y && extents.x > extents.z) {
             return 0;
@@ -42,7 +49,7 @@ public:
 
 };
 
-__device__ inline AABB joinAABBs(const AABB& box0, const AABB& box1) {
+__host__ __device__ inline AABB joinAABBs(const AABB& box0, const AABB& box1) {
 	glm::vec3 min(fminf(box0.minPoint.x, box1.minPoint.x),
 		fminf(box0.minPoint.y, box1.minPoint.y),
 		fminf(box0.minPoint.z, box1.minPoint.z));
