@@ -1,7 +1,12 @@
 #include "bvh.h"
 
 __device__ BVHNode::BVHNode(Hittable** objects, int start, int end, utils::random::RNG& rng) {
-	int axis = rng.getRandomInt(0, 2);
+	auto bbox = AABB();
+	for (int i = start; i < end; i++) {
+		bbox = joinAABBs(bbox, objects[i]->boundingBox());
+	}
+	int axis = bbox.longestAxis();
+
 	auto comparator = (axis == 0) ? boxXCompare
 					: (axis == 1) ? boxYCompare
 								  : boxZCompare;

@@ -28,6 +28,18 @@ public:
         }
         return true;
     }
+
+    __device__ inline int longestAxis() const {
+        glm::vec3 extents = maxPoint - minPoint;
+        if (extents.x > extents.y && extents.x > extents.z) {
+            return 0;
+        } else if (extents.y > extents.z) {
+            return 1;
+        } else {
+            return 2;
+		}
+    }
+
 };
 
 __device__ inline AABB joinAABBs(const AABB& box0, const AABB& box1) {
